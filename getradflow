@@ -1,0 +1,71 @@
+#! /usr/bin/python3
+import os
+import re
+import sys
+from regmatch import regmatch
+from printListOfDictToTable import printListOfDictToTable
+from isValidMac import isValidMac
+
+
+if len(sys.argv) < 3:
+    print('Invalid number of arguments. Syntax is getradflow <file name> <mac>.')
+    sys.exit()
+
+mac = sys.argv[2].replace(':', '-').upper()
+
+if isValidMac(mac) == False:
+    print('Invalid mac address!')
+    sys.exit()
+
+if os.path.exists(sys.argv[1]) == False:
+    print('Invalid file name!')
+    sys.exit()
+
+prrt = os.path.abspath(sys.argv[1])
+
+session = None
+regString = 'CallingStationID=' + mac + '.*RADIUS PACKET.*Code='
+titleLength = 100
+
+
+title = 'RADIUS flow(s) for ' + mac
+print('=' * titleLength)
+print(title.center(titleLength))
+
+if len(sys.argv) >= 4:
+    session = sys.argv[3]
+    regString = 'sesn=' + session + '.*' + regString
+    sessTitle = 'with SessionID ' + session
+    print(sessTitle.center(titleLength))
+
+print(os.path.basename(prrt).center(titleLength))
+print('=' * titleLength)
+
+reg = re.compile(regString)
+
+match = regmatch(reg, prrt)
+
+if match == '':
+    print('No matching flows found in ' + os.path.basename(prrt))
+    sys.exit()
+
+matchLines = match.split('\n')
+
+flowRecords = []
+for line in matchLines:
+
+    split = line.split()
+    tempTime = split[0].strip(
+        'Radius,') + ' ' + split[1].split(',')[0] + ',' + split[1].split(',')[1]
+    tempPacket = split[3].replace('Code=', '').strip('()0123456789')
+    tempSessionID = split[1].split(',')[5].strip('sesn=')
+
+    record = {'time': None, 'packet': None, 'sessionID': None}
+    record['time'] = tempTime
+    record['packet'] = tempPacket
+    record['sessionID'] = tempSessionID
+    flowRecords.append(record)
+
+printListOfDictToTable(flowRecords)
+print('='*titleLength)
+print(match)
